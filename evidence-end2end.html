@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>海关案件证据全链路规划（Evidence End-to-End）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1E40AF;
+      --secondary: #3B82F6;
+      --accent: #F59E0B;
+      --bg: #F8FAFC;
+      --text: #0F172A;
+      --muted: #475569;
+      --border: #E2E8F0;
+      --card: #FFFFFF;
+    }
+    body { font-family: "Fira Sans", "Segoe UI", system-ui, -apple-system, sans-serif; margin: 0; color: var(--text); line-height: 1.6; background: var(--bg); }
+    .page { max-width: 1280px; margin: 24px auto; padding: 0 24px 24px; }
+    h1, h2, h3 { color: var(--primary); margin-bottom: 8px; letter-spacing: 0.2px; }
+    h1 { margin-top: 0; font-weight: 700; }
+    .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .export-pdf-wrap { margin-left: auto; }
+    .export-btn { background: var(--accent); color: #1f2933; border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px rgba(245,158,11,0.25); transition: background 0.2s ease, box-shadow 0.2s ease; }
+    .export-btn:hover { background: #fbbf24; box-shadow: 0 10px 22px rgba(245,158,11,0.3); }
+    .export-btn:disabled { opacity: 0.7; cursor: wait; }
+    body.exporting .export-pdf-wrap { display: none; }
+    body.exporting .phase-card { box-shadow: none; }
+    body.exporting svg { border-color: #e5e7eb; }
+    .summary { background: var(--card); border: 1px solid var(--border); padding: 16px 18px; border-radius: 12px; box-shadow: 0 10px 20px rgba(15,23,42,0.05); }
+    .flow-wrap { margin: 22px 0; overflow-x: auto; }
+    svg { width: 100%; max-width: 1800px; border: 1px solid var(--border); border-radius: 10px; background: #fbfdff; display: block; }
+    svg text { font-family: "Fira Sans", "Segoe UI", system-ui, -apple-system, sans-serif; }
+    svg line { stroke-linecap: round; }
+    .phase-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-top: 14px; box-shadow: 0 10px 20px rgba(15,23,42,0.05); }
+    .phase-card h3 { margin-top: 0; }
+    .phase-card h4 { margin: 10px 0 6px; color: var(--text); font-size: 14px; }
+    .phase-card h5 { margin: 6px 0 6px; color: var(--text); font-size: 13px; }
+    .grid-table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    .grid-table th, .grid-table td { border: 1px solid var(--border); padding: 8px; vertical-align: top; font-size: 13px; }
+    .grid-table th { background: #eff6ff; color: var(--text); }
+    details.collapsible { margin-top: 8px; }
+    details.collapsible summary { cursor: pointer; font-weight: 600; color: var(--primary); list-style: none; }
+    details.collapsible summary::-webkit-details-marker { display: none; }
+    details.collapsible summary:before { content: "▾"; margin-right: 6px; color: var(--secondary); }
+    details.collapsible:not([open]) summary:before { content: "▸"; }
+    details.collapsible summary h5 { display: inline; margin: 0; }
+    .sub-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+    ul { margin: 6px 0 0 18px; }
+    code { font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #e2e8f0; padding: 2px 4px; border-radius: 4px; }
+    @media print {
+      body { margin: 0; }
+      .export-pdf-wrap { display: none !important; }
+      .phase-card { box-shadow: none; }
+      svg { border-color: #e5e7eb; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+  <div class="top-bar">
+    <h1>海关案件证据全链路规划 - 方式一：数据格式化</h1>
+    <div class="export-pdf-wrap">
+      <button id="export-pdf" class="export-btn" type="button">导出PDF</button>
+    </div>
+  </div>
+  <div class="summary">
+    <strong>主线：</strong> 案件建立/权限 → 证据管理 → 数据格式化 → 证据挖掘 → 证据复核<br/>
+    <strong>子阶段映射：</strong> 上传/目录 → 清洗 → 标签/检索/比对 → 输出/审计<br/>
+    <strong>目标：</strong> 完整采集、多模态可计算、智能挖掘、可追溯复核与合规交付。<br/>
+    <strong>系统底座：</strong> 组织/人员、元数据/字典、审计/监控，统一支撑全流程的权限、命名空间与合规治理。<br/>
+    <br/>
+    <strong>待验证- 方式二：</strong> 采用skill or  Agent 直接用大模型进行筛选和挖掘。不再用格式化，利用大模型的多模态能力。
+  </div>
+
+   <h2>证据挖掘处理逻辑（证据大表填充逻辑）</h2>
+  <div class="phase-card">
+    <h3>整体定位与主线嵌入</h3>
+    <p>证据大表是“还原犯罪过程证据链路”的核心产物，应当在案件生命周期中被明确为全流程的填充目标。采用“两段式”方案：在 0.案件建立/权限 阶段完成“案型—证据大表模板”的绑定；在 4.证据挖掘 阶段生成草表；在 5.证据复核/输出 阶段定稿。0 阶段由案型驱动模板字段、口径、时间线维度、关键参与者维度与资金/物流/通讯链路结构，并纳入案件元数据与审计。3.数据格式化阶段产出“可映射字段”的中间结构；4.证据挖掘阶段完成字段填充、冲突消解与置信度计算，生成草表；5.阶段执行人工复核与签名定稿，保证司法可用与可追溯。</p>
+
+    <h3>字段映射与填充机制</h3>
+    <p>建议引入“字段映射层（Field Mapping Layer）”，为每个模板字段定义口径、来源优先级、允许证据类型与冲突规则。例如“交易时间”允许来自支付流水/聊天记录/物流签收等来源，并对精度（分钟/天）打标。数据格式化阶段输出“字段候选池”（含来源证据ID、提取方式、置信度、时间戳、主体/客体、原文片段与结构化值）。证据挖掘阶段完成候选融合与异常标注，并记录“填充链路（Fill Lineage）”：字段 → 候选 → 证据 → 原始文件；同时维护字段状态（空缺/已填/需复核/冲突），让复核人员聚焦风险字段。</p>
+
+    <h3>版本链、审计与权限联动</h3>
+    <p>证据大表需与证据管理的“不可变 + 版本链”机制联动。每次字段更新（自动或人工）生成新版本节点，记录变更原因、字段清单、审批人与差异摘要，并与证据版本 hash/manifest 建立双向引用。权限上，大表字段具备粒度化控制：调查员可填充字段但不可覆盖高风险字段，复核人员拥有冲突字段最终决策权，管理员有回滚权。证据版本发生迭代时触发“影响评估”，标记受影响字段为“需复核”，生成差异报告；回滚策略为“回滚即新版本”，保证历史可追溯与审计闭环。</p>
+
+    <h3>案型模板差异与证据大表填充</h3>
+    <p>针对不同案型，证据大表应采用“模板驱动、分表组织、字段映射一致”的结构。以“境外走私代购（奢侈品代购类）”为例，证据大表拆为“销售情况/购买情况”两类输出表，字段聚焦交易链路：交易方、商品名称/型号/数量、报价与付款金额分解（微信/支付宝/银行卡/其他）、交易时间、发货与物流（发货信息、运输公司、运单号）、保卡号、过货人/时间、收货信息与备注等，形成“交易 → 物流 → 收货”的证据链路可复原表。对“套代购”则保留两套逻辑：其一“以时间和任务关系为准”的多源匹配型大表，强调免税店购物数据 ↔ 支付数据 ↔ 微信/支付宝/银行转账数据的时间差、付款差、跨小票关联、匹配等级与积分扣减；其二“以购买商品为准”的商品粒度分析表，强调商品数量不一致、应付/实付差异、两次删除未计税数据对比、人工/AI 匹配差异原因等。两套表同时输出“已匹配/未匹配”“支付全量列表/购物人员列表”，支撑复核与补证。</p>
+
+    <details class="collapsible" open>
+      <summary><h5>字段映射表结构（简版）</h5></summary>
+      <table class="grid-table">
+        <tr><th>字段组</th><th>字段示例</th><th>来源证据</th><th>关联键</th><th>填充规则</th><th>状态/置信度</th></tr>
+        <tr><td>交易标识</td><td>小票号/交易单号/提货单号</td><td>免税店交易记录、订单文件</td><td>票据号/业务号</td><td>主键唯一性校验，重复合并</td><td>已填/高</td></tr>
+        <tr><td>主体信息</td><td>证件号/姓名/联系电话</td><td>出入关数据、交易记录</td><td>证件号/手机号</td><td>模糊匹配+同名消歧</td><td>需复核/中</td></tr>
+        <tr><td>商品信息</td><td>商品名称/型号/数量/HS编码</td><td>交易清单、发货清单</td><td>商品编号/清单号</td><td>规格归一化+单位换算</td><td>已填/高</td></tr>
+        <tr><td>支付信息</td><td>付款金额/方式/时间/账户</td><td>微信/支付宝/银行流水</td><td>支付订单号/卡号</td><td>金额差阈值与时间窗匹配</td><td>冲突/中</td></tr>
+        <tr><td>物流与关务</td><td>运单号/运输公司/出入关时间</td><td>物流单据、出入关记录</td><td>运单号/证件号</td><td>时间一致性与路径校验</td><td>已填/中</td></tr>
+        <tr><td>关系与链路</td><td>代购关系/资金链路/时间线</td><td>多源融合</td><td>主体+时间窗</td><td>跨源关联与关系强度评分</td><td>需复核/中</td></tr>
+        <tr><td>差异与备注</td><td>付款差/时间差/异常备注</td><td>比对结果</td><td>交易主键</td><td>阈值规则+人工标注</td><td>待确认/低</td></tr>
+      </table>
+    </details>
+
+    <details class="collapsible" open>
+      <summary><h5>案型字段映射（境外走私代购：销售/购买两表）</h5></summary>
+      <table class="grid-table">
+        <tr><th>字段</th><th>来源证据</th><th>关联键</th><th>规则/说明</th></tr>
+        <tr><td>交易方</td><td>交易记录/对话记录</td><td>订单号/业务号</td><td>统一主体别名与账户归一</td></tr>
+        <tr><td>商品名称/型号/数量</td><td>交易清单/发货清单</td><td>商品编号/清单号</td><td>规格归一化、单位换算</td></tr>
+        <tr><td>商品报价/币种</td><td>报价单/支付记录</td><td>订单号/报价单号</td><td>币种与金额统一到基准币种</td></tr>
+        <tr><td>付款金额合计（微信/支付宝/银行卡/其他）</td><td>支付流水</td><td>支付订单号/卡号</td><td>按渠道分拆与合计核验</td></tr>
+        <tr><td>交易时间/发货时间/收货时间</td><td>交易记录/物流记录</td><td>订单号/运单号</td><td>时间线一致性校验</td></tr>
+        <tr><td>发货信息/运输公司/运单号</td><td>物流单据</td><td>运单号</td><td>物流链路完整性检查</td></tr>
+        <tr><td>保卡号/过货人/过货时间</td><td>随货资料/关务记录</td><td>保卡号/证件号</td><td>过货节点与交易/物流对齐</td></tr>
+        <tr><td>收货信息/备注</td><td>签收记录/人工备注</td><td>订单号</td><td>异常备注需人工复核</td></tr>
+      </table>
+    </details>
+
+    <details class="collapsible" open>
+      <summary><h5>案型字段映射（套代购：以时间与任务关系为准）</h5></summary>
+      <table class="grid-table">
+        <tr><th>字段</th><th>来源证据</th><th>关联键</th><th>规则/说明</th></tr>
+        <tr><td>订单序号/业务号/小票号/海关小票号/提货单号</td><td>免税店购物数据</td><td>票据号/业务号</td><td>作为主交易链路主键</td></tr>
+        <tr><td>证件号/姓名/联系电话</td><td>购物数据/出入关数据</td><td>证件号/手机号</td><td>多源一致性与消歧</td></tr>
+        <tr><td>交易时间/实付金额/税金/支付方式</td><td>免税店购物数据</td><td>订单号</td><td>交易主表字段</td></tr>
+        <tr><td>支付订单号/付款金额/付款时间/支付方式</td><td>免税店购物支付数据</td><td>订单号/支付订单号</td><td>与交易主表对齐</td></tr>
+        <tr><td>转账交易单号/金额/时间/方式/账户</td><td>微信/支付宝/银行流水</td><td>交易单号/卡号</td><td>与订单号做时间窗匹配</td></tr>
+        <tr><td>时间差/付款差/跨小票关联</td><td>比对结果</td><td>订单号</td><td>阈值规则+异常标记</td></tr>
+        <tr><td>匹配等级/积分扣减/实际应付款</td><td>比对结果</td><td>订单号</td><td>解释支付偏差原因</td></tr>
+        <tr><td>手工备注</td><td>人工复核</td><td>订单号</td><td>作为最终证据链补充</td></tr>
+      </table>
+    </details>
+
+    <details class="collapsible" open>
+      <summary><h5>案型字段映射（套代购：以购买商品为准）</h5></summary>
+      <table class="grid-table">
+        <tr><th>字段</th><th>来源证据</th><th>关联键</th><th>规则/说明</th></tr>
+        <tr><td>商品名称/种类/规格/数量</td><td>免税店购物数据</td><td>订单号/商品编号</td><td>按商品维度展开</td></tr>
+        <tr><td>交易时间/单价/实付金额</td><td>免税店购物数据</td><td>订单号</td><td>商品维度定价核验</td></tr>
+        <tr><td>支付订单号/付款金额/付款时间</td><td>支付数据</td><td>订单号/支付订单号</td><td>与商品行对齐</td></tr>
+        <tr><td>时间差（秒）/是否已验证</td><td>比对结果</td><td>订单号</td><td>校验通过与否</td></tr>
+        <tr><td>需付款-现金/积分/实际付款总额</td><td>比对结果</td><td>订单号</td><td>拆解应付与实付</td></tr>
+        <tr><td>付款金额差（支付转账-应付现金）</td><td>比对结果</td><td>订单号</td><td>异常偏差识别</td></tr>
+        <tr><td>两次删除未计税数据对比</td><td>清洗前后结果</td><td>订单号</td><td>说明数据清洗影响</td></tr>
+        <tr><td>商品数量不一致/人工-AI差异备注</td><td>人工复核/模型结果</td><td>订单号</td><td>差异解释与定性</td></tr>
+      </table>
+    </details>
+    <details class="collapsible" open>
+      <summary><h5>人物关系图谱定义与模板【需再次复核】</h5></summary>
+      <p>图谱模板用于明确“人物/物品/事件/票据”等核心维度的节点与关系，并与证据大表字段映射，保证填充可追溯与可复核。</p>
+      <table class="grid-table">
+        <tr><th>维度</th><th>定义</th><th>关键属性</th><th>证据来源绑定</th></tr>
+        <tr><td>节点：人员</td><td>嫌疑人/同案/关联人/上游/下游/亲属</td><td>姓名/别名/证件号/手机号</td><td>证据ID + 提取方式 + 置信度</td></tr>
+        <tr><td>节点：账户/设备</td><td>账号/银行卡/设备</td><td>账号ID/设备号/归属人</td><td>证据ID + 时间戳</td></tr>
+        <tr><td>节点：物品/商品</td><td>涉案商品/奢侈品</td><td>品牌/型号/数量/金额</td><td>票据/表格/图片来源</td></tr>
+        <tr><td>节点：事件</td><td>交易/运输/沟通</td><td>时间/地点/金额/渠道</td><td>对话/订单/物流</td></tr>
+        <tr><td>边：关系</td><td>交易/转账/代购/共现</td><td>关系类型/强度/方向</td><td>证据ID + 规则/模型解释</td></tr>
+      </table>
+
+      <table class="grid-table">
+        <tr><th>证据大表字段</th><th>图谱映射</th><th>填充口径</th></tr>
+        <tr><td>嫌疑人/关联人</td><td>人员节点.name</td><td>取最高置信度/多值保留</td></tr>
+        <tr><td>关系类型</td><td>关系边.type</td><td>按案型模板枚举</td></tr>
+        <tr><td>资金金额</td><td>事件节点.amount</td><td>金额标准化 + 币种统一</td></tr>
+        <tr><td>交易时间/地点</td><td>事件节点.time/location</td><td>时间线归一化</td></tr>
+        <tr><td>证据来源</td><td>evidence_id / extract_method</td><td>追溯链路与版本</td></tr>
+      </table>
+    </details>
+
+
+  </div>
+
+
+  <h2>整体流程图（含分支 + 系统底座）</h2>
+  <div class="flow-wrap">
+        <svg viewBox="0 0 1800 900" preserveAspectRatio="xMidYMin meet" aria-label="证据处理流程图">
+      <!-- 背景列（对齐主干与分支，提升可读性） -->
+      <rect x="30" y="40" width="220" height="660" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+      <rect x="280" y="40" width="240" height="660" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+      <rect x="540" y="40" width="380" height="660" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+      <rect x="930" y="40" width="560" height="660" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+      <rect x="1500" y="40" width="260" height="660" rx="12" fill="#f8fafc" stroke="#e2e8f0" />
+
+      <!-- 主干节点（平行） -->
+      <rect x="40" y="60" width="200" height="60" rx="10" fill="#1E40AF" opacity="0.92"></rect>
+      <text x="140" y="98" text-anchor="middle" fill="#fff" font-size="16">1.案件建立 / 权限</text>
+
+      <rect x="300" y="60" width="220" height="60" rx="10" fill="#3B82F6" opacity="0.92"></rect>
+      <text x="410" y="98" text-anchor="middle" fill="#fff" font-size="16">2.证据管理</text>
+
+      <rect x="580" y="60" width="220" height="60" rx="10" fill="#1E40AF" opacity="0.92"></rect>
+      <text x="690" y="98" text-anchor="middle" fill="#fff" font-size="16">3.数据格式化</text>
+
+      <rect x="1030" y="60" width="220" height="60" rx="10" fill="#3B82F6" opacity="0.92"></rect>
+      <text x="1140" y="98" text-anchor="middle" fill="#fff" font-size="16">4.证据挖掘</text>
+
+      <rect x="1500" y="60" width="220" height="60" rx="10" fill="#1E40AF" opacity="0.92"></rect>
+      <text x="1610" y="98" text-anchor="middle" fill="#fff" font-size="16">5.证据复核 / 输出</text>
+      <!-- 主干箭头 -->
+      <line x1="240" y1="90" x2="300" y2="90" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+      <line x1="520" y1="90" x2="580" y2="90" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+      <line x1="800" y1="90" x2="1030" y2="90" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+      <line x1="1250" y1="90" x2="1500" y2="90" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" />
+
+      <!-- 分支：1.案件建立/权限 -->
+      <line x1="140" y1="120" x2="140" y2="150" stroke="#94a3b8" stroke-width="2" />
+      <rect x="55" y="150" width="170" height="42" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="140" y="176" text-anchor="middle" fill="#0f172a" font-size="12">案件类型/模板</text>
+      <line x1="140" y1="192" x2="140" y2="204" stroke="#94a3b8" stroke-width="2" />
+      <rect x="55" y="204" width="170" height="42" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="140" y="230" text-anchor="middle" fill="#0f172a" font-size="12">角色/权限/审计</text>
+
+      <!-- 分支：2.证据管理 -->
+      <line x1="410" y1="120" x2="410" y2="150" stroke="#94a3b8" stroke-width="2" />
+      <rect x="325" y="150" width="170" height="42" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="410" y="176" text-anchor="middle" fill="#0f172a" font-size="12">上传/目录/存储</text>
+      <line x1="410" y1="192" x2="410" y2="204" stroke="#94a3b8" stroke-width="2" />
+      <rect x="325" y="204" width="170" height="42" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="410" y="230" text-anchor="middle" fill="#0f172a" font-size="12">配额/审计</text>
+
+      <!-- 分支：3.数据格式化（与最新流程对齐） -->
+      <line x1="690" y1="120" x2="690" y2="140" stroke="#f59e0b" stroke-width="2" />
+      <rect x="580" y="140" width="220" height="30" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+      <text x="690" y="160" text-anchor="middle" fill="#92400e" font-size="11">编排层/策略配置</text>
+      <line x1="690" y1="170" x2="690" y2="178" stroke="#f59e0b" stroke-width="2" />
+      <rect x="580" y="178" width="220" height="30" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+      <text x="690" y="198" text-anchor="middle" fill="#92400e" font-size="11">能力颗粒库（原子能力）</text>
+
+      <line x1="690" y1="208" x2="690" y2="220" stroke="#f59e0b" stroke-width="2" />
+      <line x1="690" y1="220" x2="620" y2="220" stroke="#f59e0b" stroke-width="2" />
+      <line x1="690" y1="220" x2="800" y2="220" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="220" x2="620" y2="232" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="220" x2="800" y2="232" stroke="#f59e0b" stroke-width="2" />
+
+      <rect x="540" y="232" width="160" height="26" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+      <text x="620" y="250" text-anchor="middle" fill="#92400e" font-size="10">template: 简单案件</text>
+      <rect x="720" y="232" width="160" height="26" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+      <text x="800" y="250" text-anchor="middle" fill="#92400e" font-size="10">template: 复杂案件</text>
+
+      <line x1="620" y1="258" x2="620" y2="264" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="258" x2="800" y2="264" stroke="#f59e0b" stroke-width="2" />
+
+      <rect x="540" y="264" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="278" text-anchor="middle" fill="#92400e" font-size="9">S1 对话时序（按需）</text>
+      <rect x="540" y="290" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="304" text-anchor="middle" fill="#92400e" font-size="9">S2 图片解析（按需）</text>
+      <rect x="540" y="316" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="330" text-anchor="middle" fill="#92400e" font-size="9">S3 语音解析（按需）</text>
+      <rect x="540" y="342" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="356" text-anchor="middle" fill="#92400e" font-size="9">S4 视频解析（按需）</text>
+      <rect x="540" y="368" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="382" text-anchor="middle" fill="#92400e" font-size="9">S5 表格解析（按需）</text>
+      <rect x="540" y="394" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="408" text-anchor="middle" fill="#92400e" font-size="9">S6 Excel解析（按需）</text>
+      <rect x="540" y="420" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="434" text-anchor="middle" fill="#92400e" font-size="9">S7 邮件解析（按需）</text>
+      <rect x="540" y="446" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="460" text-anchor="middle" fill="#92400e" font-size="9">S8 实体抽取</text>
+      <rect x="540" y="472" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="486" text-anchor="middle" fill="#92400e" font-size="9">S9 关系/图谱</text>
+      <rect x="540" y="498" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="512" text-anchor="middle" fill="#92400e" font-size="9">S11 质量校验</text>
+      <rect x="540" y="524" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="620" y="538" text-anchor="middle" fill="#92400e" font-size="9">S12 落库归档</text>
+
+      <line x1="620" y1="284" x2="620" y2="290" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="310" x2="620" y2="316" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="336" x2="620" y2="342" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="362" x2="620" y2="368" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="388" x2="620" y2="394" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="414" x2="620" y2="420" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="440" x2="620" y2="446" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="466" x2="620" y2="472" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="492" x2="620" y2="498" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="518" x2="620" y2="524" stroke="#f59e0b" stroke-width="2" />
+
+      <rect x="720" y="264" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="278" text-anchor="middle" fill="#92400e" font-size="9">S1 对话时序</text>
+      <rect x="720" y="290" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="304" text-anchor="middle" fill="#92400e" font-size="9">S10 轻量索引</text>
+      <rect x="720" y="316" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="330" text-anchor="middle" fill="#92400e" font-size="9">S8 实体抽取</text>
+      <rect x="720" y="342" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="356" text-anchor="middle" fill="#92400e" font-size="9">S9 初版图谱</text>
+      <rect x="720" y="368" width="160" height="20" rx="6" fill="#f8fafc" stroke="#cbd5f5" />
+      <text x="800" y="382" text-anchor="middle" fill="#0f172a" font-size="9">多轮条件/迭代</text>
+      <rect x="720" y="394" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="408" text-anchor="middle" fill="#92400e" font-size="9">S2 图片解析（按需）</text>
+      <rect x="720" y="420" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="434" text-anchor="middle" fill="#92400e" font-size="9">S3 语音解析（按需）</text>
+      <rect x="720" y="446" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="460" text-anchor="middle" fill="#92400e" font-size="9">S4 视频解析（按需）</text>
+      <rect x="720" y="472" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="486" text-anchor="middle" fill="#92400e" font-size="9">S5 表格解析（按需）</text>
+      <rect x="720" y="498" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="512" text-anchor="middle" fill="#92400e" font-size="9">S6 Excel解析</text>
+      <rect x="720" y="524" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="538" text-anchor="middle" fill="#92400e" font-size="9">S7 邮件解析（按需）</text>
+      <rect x="720" y="550" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="564" text-anchor="middle" fill="#92400e" font-size="9">S11 质量校验</text>
+      <rect x="720" y="576" width="160" height="20" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="800" y="590" text-anchor="middle" fill="#92400e" font-size="9">S12 落库归档</text>
+
+      <line x1="800" y1="284" x2="800" y2="290" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="310" x2="800" y2="316" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="336" x2="800" y2="342" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="362" x2="800" y2="368" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="388" x2="800" y2="394" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="414" x2="800" y2="420" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="440" x2="800" y2="446" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="466" x2="800" y2="472" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="492" x2="800" y2="498" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="518" x2="800" y2="524" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="544" x2="800" y2="550" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="570" x2="800" y2="576" stroke="#f59e0b" stroke-width="2" />
+
+      <rect x="540" y="602" width="160" height="26" rx="8" fill="#e5efff" stroke="#94a3b8" />
+      <text x="620" y="620" text-anchor="middle" fill="#0f172a" font-size="10">字段候选池</text>
+      <rect x="540" y="634" width="160" height="26" rx="8" fill="#eef2ff" stroke="#6366f1" />
+      <text x="620" y="652" text-anchor="middle" fill="#3730a3" font-size="10">数据落地/索引</text>
+      <line x1="620" y1="544" x2="620" y2="602" stroke="#f59e0b" stroke-width="2" />
+      <line x1="620" y1="628" x2="620" y2="634" stroke="#f59e0b" stroke-width="2" />
+
+      <rect x="720" y="602" width="160" height="26" rx="8" fill="#e5efff" stroke="#94a3b8" />
+      <text x="800" y="620" text-anchor="middle" fill="#0f172a" font-size="10">字段候选池</text>
+      <rect x="720" y="634" width="160" height="26" rx="8" fill="#eef2ff" stroke="#6366f1" />
+      <text x="800" y="652" text-anchor="middle" fill="#3730a3" font-size="10">数据落地/索引</text>
+      <line x1="800" y1="596" x2="800" y2="602" stroke="#f59e0b" stroke-width="2" />
+      <line x1="800" y1="628" x2="800" y2="634" stroke="#f59e0b" stroke-width="2" />
+
+      <!-- 共享资产：人物关系图谱（仅覆盖至证据挖掘） -->
+      <line x1="140" y1="246" x2="140" y2="700" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="620" y1="634" x2="620" y2="700" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="800" y1="634" x2="800" y2="700" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="1140" y1="360" x2="1140" y2="700" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <rect x="40" y="700" width="1430" height="34" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="4 3" />
+      <text x="755" y="722" text-anchor="middle" fill="#0f172a" font-size="12">
+        <tspan x="755" dy="0">人物关系图谱（案情获取初版，贯穿数据格式化/证据挖掘持续完善）</tspan>
+      </text>
+
+      <!-- 证据大表 -->
+      <line x1="140" y1="700" x2="140" y2="750" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="620" y1="700" x2="620" y2="750" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="800" y1="700" x2="800" y2="750" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="1140" y1="700" x2="1140" y2="750" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <line x1="1610" y1="526" x2="1610" y2="750" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" />
+      <rect x="40" y="750" width="1720" height="34" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="4 3" />
+      <text x="900" y="772" text-anchor="middle" fill="#0f172a" font-size="12">
+        <tspan x="900" dy="0">证据大表（案型预设模版，数据格式化/证据挖掘/证据复核中对内容进行挖掘和校验）</tspan>
+      </text>
+
+      <!-- 分支：4.证据挖掘（结构化分支闭环） -->
+      <line x1="1140" y1="120" x2="1140" y2="150" stroke="#94a3b8" stroke-width="2" />
+      <rect x="940" y="150" width="200" height="26" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="1040" y="168" text-anchor="middle" fill="#0f172a" font-size="10">挖掘入口（字段候选池/索引/图谱）</text>
+      <rect x="1180" y="150" width="200" height="26" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="1280" y="168" text-anchor="middle" fill="#0f172a" font-size="10">结构化程度判断</text>
+      <line x1="1140" y1="163" x2="1180" y2="163" stroke="#94a3b8" stroke-width="2" />
+
+      <line x1="1280" y1="176" x2="1280" y2="196" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1030" y1="196" x2="1390" y2="196" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1030" y1="196" x2="1030" y2="206" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1210" y1="196" x2="1210" y2="206" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1390" y1="196" x2="1390" y2="206" stroke="#94a3b8" stroke-width="2" />
+
+      <rect x="950" y="206" width="160" height="24" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+      <text x="1030" y="222" text-anchor="middle" fill="#92400e" font-size="9">高结构化（SQL/BI）</text>
+      <rect x="1130" y="206" width="160" height="24" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+      <text x="1210" y="222" text-anchor="middle" fill="#92400e" font-size="9">混合型（规则+LLM）</text>
+      <rect x="1310" y="206" width="160" height="24" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+      <text x="1390" y="222" text-anchor="middle" fill="#92400e" font-size="9">低结构化（LLM/图谱）</text>
+
+      <rect x="950" y="236" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1030" y="251" text-anchor="middle" fill="#92400e" font-size="9">SQL/BI 规则分析</text>
+      <rect x="950" y="262" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1030" y="277" text-anchor="middle" fill="#92400e" font-size="9">异常识别/对账</text>
+      <rect x="950" y="288" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1030" y="303" text-anchor="middle" fill="#92400e" font-size="9">证据大表字段填充</text>
+      <rect x="950" y="314" width="160" height="22" rx="6" fill="#eef2ff" stroke="#6366f1" />
+      <text x="1030" y="329" text-anchor="middle" fill="#3730a3" font-size="9">规则阈值/口径回写</text>
+
+      <rect x="1130" y="236" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1210" y="251" text-anchor="middle" fill="#92400e" font-size="9">结构化+语义融合</text>
+      <rect x="1130" y="262" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1210" y="277" text-anchor="middle" fill="#92400e" font-size="9">图谱校验/补全</text>
+      <rect x="1130" y="288" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1210" y="303" text-anchor="middle" fill="#92400e" font-size="9">证据大表字段填充</text>
+      <rect x="1130" y="314" width="160" height="22" rx="6" fill="#eef2ff" stroke="#6366f1" />
+      <text x="1210" y="329" text-anchor="middle" fill="#3730a3" font-size="9">回写规则/提示/图谱</text>
+
+      <rect x="1310" y="236" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1390" y="251" text-anchor="middle" fill="#92400e" font-size="9">语义理解/图谱推断</text>
+      <rect x="1310" y="262" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1390" y="277" text-anchor="middle" fill="#92400e" font-size="9">定向深解析触发</text>
+      <rect x="1310" y="288" width="160" height="22" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+      <text x="1390" y="303" text-anchor="middle" fill="#92400e" font-size="9">证据大表字段填充</text>
+      <rect x="1310" y="314" width="160" height="22" rx="6" fill="#eef2ff" stroke="#6366f1" />
+      <text x="1390" y="329" text-anchor="middle" fill="#3730a3" font-size="9">多轮条件更新/图谱增量</text>
+
+      <line x1="1030" y1="230" x2="1030" y2="236" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1030" y1="258" x2="1030" y2="262" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1030" y1="284" x2="1030" y2="288" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1030" y1="310" x2="1030" y2="314" stroke="#94a3b8" stroke-width="2" />
+
+      <line x1="1210" y1="230" x2="1210" y2="236" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1210" y1="258" x2="1210" y2="262" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1210" y1="284" x2="1210" y2="288" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1210" y1="310" x2="1210" y2="314" stroke="#94a3b8" stroke-width="2" />
+
+      <line x1="1390" y1="230" x2="1390" y2="236" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1390" y1="258" x2="1390" y2="262" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1390" y1="284" x2="1390" y2="288" stroke="#94a3b8" stroke-width="2" />
+      <line x1="1390" y1="310" x2="1390" y2="314" stroke="#94a3b8" stroke-width="2" />
+
+      <!-- 分支：5.证据复核/输出 -->
+      <line x1="1610" y1="120" x2="1610" y2="430" stroke="#94a3b8" stroke-width="2" />
+      <rect x="1525" y="430" width="170" height="42" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="1610" y="456" text-anchor="middle" fill="#0f172a" font-size="12">人工复核/追溯</text>
+      <line x1="1610" y1="472" x2="1610" y2="484" stroke="#94a3b8" stroke-width="2" />
+      <rect x="1525" y="484" width="170" height="42" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+      <text x="1610" y="510" text-anchor="middle" fill="#0f172a" font-size="12">导出/报告/审计</text>
+
+      <!-- 底座：0.系统级管理 -->
+      <rect x="40" y="800" width="1720" height="46" rx="10" fill="#e5efff" stroke="#94a3b8" stroke-dasharray="6 4" />
+      <text x="840" y="828" text-anchor="end" fill="#0f172a" font-size="16" font-weight="700">0.系统底座：</text>
+      <text x="845" y="828" text-anchor="start" fill="#0f172a" font-size="13">组织/人员 · 元数据/字典 · 审计/监控/合规</text>
+
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <h2>按处理流程描述</h2>
+
+  <div class="phase-card">
+    <h3>0.系统底座能力</h3>
+    <ul>
+      <li><strong>组织与人员：</strong> 关区/科室/小组组织树，岗位/角色模型，人员主数据（职务、警号、联系方式），支持多级授权与代理。</li>
+      <li><strong>元数据 / 字典：</strong> 案件类型、关区、HS 编码、渠道、风险标签、证据类别、保密级别等统一字典；版本化与发布流程；API/前端表单统一引用。</li>
+      <li><strong>统一权限与命名空间：</strong> 租户/案件双层隔离，命名空间规范（caseId 前缀），跨案访问需授权与审计。</li>
+      <li><strong>审计 / 监控 / 合规：</strong> 统一日志与审计流水；安全基线（MFA、IP 白名单、操作水印）；指标与告警（权限异常、未授权拦截、性能指标）；合规策略（留存、冷存、合规锁）。</li>
+    </ul>
+  </div>
+
+  <div class="phase-card">
+    <h3>1.案件建立 / 权限（主线起点）</h3>
+    <p>这一段确保“正确的人在正确的案件里做正确的事”，为后续证据链路奠定安全与治理基线。</p>
+    <ul>
+      <li><strong>案件生命周期：</strong> 创建 → 分配责任人/团队 → 设置案件元信息（类型、关区、涉案级别、保密等级、留存策略）→ 状态流转（草稿/进行中/结案/归档/封存）。</li>
+      <li><strong>案件类型：</strong> 奢侈品走私、套代购、虚开、走私冻品等；类型驱动目录/命名模板、必填元数据（申报单号、物流单号、航次/航班、商品 HS 编码等）、默认保密级别、清洗/挖掘规则集与配额策略。</li>
+      <li><strong>证据大表模板绑定：</strong> 在立案阶段完成案型-模板绑定，明确大表字段口径、字段映射规则、必填字段与版本策略，为后续填充与复核提供统一目标。</li>
+      <li><strong>案情基础人物关系图谱：</strong> 案情获取时形成初版关系图谱（人-人/人-物/人-地点），作为 3/4 阶段共享资产持续完善，图谱版本与来源证据纳入审计。</li>
+      <li><strong>身份与授权：</strong> 角色（管理员/案件负责人/调查员/审计/只读）+ 权限点（上传、目录、标签、搜索、导出、复核、规则管理）；支持临时授权、时间窗与范围限制。</li>
+      <li><strong>隔离与命名空间：</strong> 案件即租户边界；存储/索引/向量库/日志均按 <code>{caseId}</code> 分区；跨案访问需显式授权并审计。</li>
+      <li><strong>安全基线：</strong> 登录与 MFA，IP/设备指纹，会话有效期，操作水印；高风险操作（删除/导出/规则发布）可启用双人校验或二次审批。</li>
+      <li><strong>审计与可观测：</strong> 案件级审计流水（用户、角色、动作、对象、结果、耗时、IP/UA）；指标：活跃用户数、权限变更次数、未授权拦截；Trace 从网关入手贯穿案件上下文。</li>
+      <li><strong>合规与留存：</strong> 案件级保留/归档策略、冷存/合规锁；封存与解封流程可追溯；支持外部审计抽查。</li>
+    </ul>
+  </div>
+
+  <div class="phase-card">
+    <h3>2.证据管理</h3>
+    <ul>
+      <li>采集：目录/批量/分片/预签名上传，REL_PATH 固化，batchId、caseId 绑定，MD5/ETag 去重，病毒扫描，配额/速率限制。</li>
+      <li>目录与存储：案件隔离的虚拟文件系统（创建/移动/删除/回收站）、路径净化、幂等移动；本地/MinIO/S3 适配；容量统计；按案件类型加载目录/命名模板并校验必填元数据。</li>
+      <li>不可变性与版本：原始证据默认不可更改；案件负责人可发起“版本迭代”申请（生成新版本并保留原版本哈希与时间戳），删除仅管理员可执行；所有版本链路与操作记录审计留痕。</li>
+      <li>审计与可观测：上传/目录操作日志，Trace 覆盖网关→上传→存储，指标（成功率、P95、去重命中）。</li>
+    </ul>
+
+    <details class="collapsible" open>
+      <summary>版本链字段表（展开/折叠）</summary>
+      <table class="grid-table">
+      <tr><th>字段</th><th>说明</th><th>示例</th></tr>
+      <tr><td>version_id</td><td>版本唯一标识</td><td>ver_9f3a...</td></tr>
+      <tr><td>parent_version_id</td><td>上一版本 ID</td><td>ver_8a2c...</td></tr>
+      <tr><td>version_no</td><td>版本号</td><td>v1 / v2</td></tr>
+      <tr><td>status</td><td>版本状态</td><td>active / superseded / void</td></tr>
+      <tr><td>change_reason</td><td>变更原因</td><td>补充缺失页</td></tr>
+      <tr><td>change_request_id</td><td>变更工单</td><td>CR-2026-001</td></tr>
+      <tr><td>approved_by / approved_at</td><td>审批人/时间</td><td>admin / 2026-02-10</td></tr>
+      <tr><td>hash_before / hash_after</td><td>变更前后哈希</td><td>md5:xxx → md5:yyy</td></tr>
+      <tr><td>diff_summary</td><td>差异摘要</td><td>新增 2 页表格</td></tr>
+      <tr><td>expand_state</td><td>展开/折叠状态</td><td>true / false</td></tr>
+      <tr><td>created_by / created_at</td><td>创建人/时间</td><td>userA / 2026-02-10</td></tr>
+      </table>
+    </details>
+
+    <details class="collapsible" open>
+      <summary>审批流程表（展开/折叠）</summary>
+      <table class="grid-table">
+      <tr><th>步骤</th><th>角色/动作</th><th>输出/记录</th></tr>
+      <tr><td>1</td><td>负责人提交变更</td><td>生成变更工单与版本草稿</td></tr>
+      <tr><td>2</td><td>系统自动校验</td><td>差异报告/风险标记</td></tr>
+      <tr><td>3</td><td>管理员审批</td><td>审批结论与签名</td></tr>
+      <tr><td>4</td><td>发布新版本</td><td>新版本生效，旧版本冻结</td></tr>
+      <tr><td>5</td><td>审计归档</td><td>审计日志与 manifest 入库</td></tr>
+      </table>
+    </details>
+
+    <details class="collapsible" open>
+      <summary>差异比对表（展开/折叠）</summary>
+      <table class="grid-table">
+      <tr><th>差异类型</th><th>比对范围</th><th>输出</th></tr>
+      <tr><td>内容差异</td><td>文本 diff / 表格行列 / 附件增删</td><td>差异明细 + 摘要</td></tr>
+      <tr><td>结构差异</td><td>文件格式、页数、表结构</td><td>结构变更说明</td></tr>
+      <tr><td>元数据差异</td><td>时间、标签、目录、参与者</td><td>元数据变更清单</td></tr>
+      <tr><td>合规差异</td><td>敏感级别/权限变化</td><td>风险提示与审批要求</td></tr>
+      </table>
+    </details>
+
+    <details class="collapsible" open>
+      <summary>回滚策略表（展开/折叠）</summary>
+      <table class="grid-table">
+      <tr><th>规则</th><th>说明</th><th>约束</th></tr>
+      <tr><td>仅回滚已审批版本</td><td>禁止回滚草稿版本</td><td>需管理员审批</td></tr>
+      <tr><td>回滚生成新版本</td><td>不覆盖历史版本</td><td>保留完整审计链</td></tr>
+      <tr><td>重新计算哈希</td><td>回滚后生成新 manifest</td><td>保证可追溯性</td></tr>
+      <tr><td>权限审计同步</td><td>回滚记录到审计流水</td><td>可用于外部审计</td></tr>
+      </table>
+    </details>
+  </div>
+
+  <div class="phase-card">
+    <h3>3.数据格式化</h3>
+    <p>目标是把多模态证据转为“可计算、可检索、可训练”的结构化数据。重设计为“能力颗粒库 + 编排层 + 策略配置”三层结构，3.1 高质量与 3.2 高效率是同一能力库的不同编排与开关组合。</p>
+
+    <div class="flow-wrap">
+      <svg viewBox="0 0 1200 640" aria-label="数据格式化流程图">
+        <rect x="20" y="30" width="110" height="32" rx="8" fill="#e5efff" stroke="#94a3b8" />
+        <text x="75" y="51" text-anchor="middle" fill="#0f172a" font-size="12">证据输入</text>
+
+        <rect x="150" y="28" width="360" height="36" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+        <text x="330" y="52" text-anchor="middle" fill="#0f172a" font-size="12">编排层/策略配置</text>
+
+        <rect x="150" y="90" width="360" height="32" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+        <text x="330" y="111" text-anchor="middle" fill="#0f172a" font-size="12">能力颗粒库</text>
+
+        <line x1="130" y1="46" x2="150" y2="46" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="330" y1="64" x2="330" y2="90" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+
+        <rect x="100" y="140" width="220" height="26" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="158" text-anchor="middle" fill="#92400e" font-size="10">template: 简单案件</text>
+
+        <rect x="360" y="140" width="220" height="26" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="158" text-anchor="middle" fill="#92400e" font-size="10">template: 复杂案件</text>
+
+        <line x1="210" y1="122" x2="210" y2="140" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="122" x2="470" y2="140" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+
+        <rect x="100" y="176" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="191" text-anchor="middle" fill="#92400e" font-size="9">S1 对话时序（按需）</text>
+        <rect x="100" y="204" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="219" text-anchor="middle" fill="#92400e" font-size="9">S2 图片解析（按需）</text>
+        <rect x="100" y="232" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="247" text-anchor="middle" fill="#92400e" font-size="9">S3 语音解析（按需）</text>
+        <rect x="100" y="260" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="275" text-anchor="middle" fill="#92400e" font-size="9">S4 视频解析（按需）</text>
+        <rect x="100" y="288" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="303" text-anchor="middle" fill="#92400e" font-size="9">S5 表格解析（按需）</text>
+        <rect x="100" y="316" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="331" text-anchor="middle" fill="#92400e" font-size="9">S6 Excel解析（按需）</text>
+        <rect x="100" y="344" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="359" text-anchor="middle" fill="#92400e" font-size="9">S7 邮件解析（按需）</text>
+        <rect x="100" y="372" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="387" text-anchor="middle" fill="#92400e" font-size="9">S8 实体抽取</text>
+        <rect x="100" y="400" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="415" text-anchor="middle" fill="#92400e" font-size="9">S9 关系/图谱</text>
+        <rect x="100" y="428" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="443" text-anchor="middle" fill="#92400e" font-size="9">S11 质量校验</text>
+        <rect x="100" y="456" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="210" y="471" text-anchor="middle" fill="#92400e" font-size="9">S12 落库归档</text>
+
+        <line x1="210" y1="166" x2="210" y2="176" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="198" x2="210" y2="204" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="226" x2="210" y2="232" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="254" x2="210" y2="260" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="282" x2="210" y2="288" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="310" x2="210" y2="316" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="338" x2="210" y2="344" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="366" x2="210" y2="372" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="394" x2="210" y2="400" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="422" x2="210" y2="428" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="450" x2="210" y2="456" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="210" y1="478" x2="210" y2="542" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+
+        <rect x="360" y="176" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="191" text-anchor="middle" fill="#92400e" font-size="9">S1 对话时序</text>
+        <rect x="360" y="204" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="219" text-anchor="middle" fill="#92400e" font-size="9">S10 轻量索引</text>
+        <rect x="360" y="232" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="247" text-anchor="middle" fill="#92400e" font-size="9">S8 实体抽取</text>
+        <rect x="360" y="260" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="275" text-anchor="middle" fill="#92400e" font-size="9">S9 初版图谱</text>
+        <rect x="360" y="288" width="220" height="22" rx="6" fill="#f8fafc" stroke="#cbd5f5" />
+        <text x="470" y="303" text-anchor="middle" fill="#0f172a" font-size="9">多轮条件/迭代</text>
+        <rect x="360" y="316" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="331" text-anchor="middle" fill="#92400e" font-size="9">S2 图片解析（按需）</text>
+        <rect x="360" y="344" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="359" text-anchor="middle" fill="#92400e" font-size="9">S3 语音解析（按需）</text>
+        <rect x="360" y="372" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="387" text-anchor="middle" fill="#92400e" font-size="9">S4 视频解析（按需）</text>
+        <rect x="360" y="400" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="415" text-anchor="middle" fill="#92400e" font-size="9">S5 表格解析（按需）</text>
+        <rect x="360" y="428" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="443" text-anchor="middle" fill="#92400e" font-size="9">S6 Excel解析（按需）</text>
+        <rect x="360" y="456" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="471" text-anchor="middle" fill="#92400e" font-size="9">S7 邮件解析（按需）</text>
+        <rect x="360" y="484" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="499" text-anchor="middle" fill="#92400e" font-size="9">S11 质量校验</text>
+        <rect x="360" y="512" width="220" height="22" rx="6" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="470" y="527" text-anchor="middle" fill="#92400e" font-size="9">S12 落库归档</text>
+
+        <line x1="470" y1="166" x2="470" y2="176" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="198" x2="470" y2="204" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="226" x2="470" y2="232" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="254" x2="470" y2="260" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="282" x2="470" y2="288" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="310" x2="470" y2="316" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="338" x2="470" y2="344" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="366" x2="470" y2="372" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="394" x2="470" y2="400" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="422" x2="470" y2="428" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="450" x2="470" y2="456" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="478" x2="470" y2="484" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="506" x2="470" y2="512" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+        <line x1="470" y1="534" x2="470" y2="542" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+
+        <rect x="100" y="542" width="220" height="28" rx="8" fill="#e5efff" stroke="#94a3b8" />
+        <text x="210" y="561" text-anchor="middle" fill="#0f172a" font-size="11">字段候选池</text>
+        <rect x="100" y="574" width="220" height="28" rx="8" fill="#eef2ff" stroke="#6366f1" />
+        <text x="210" y="593" text-anchor="middle" fill="#3730a3" font-size="11">数据落地/索引</text>
+
+        <line x1="210" y1="570" x2="210" y2="574" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+
+        <rect x="360" y="542" width="220" height="28" rx="8" fill="#e5efff" stroke="#94a3b8" />
+        <text x="470" y="561" text-anchor="middle" fill="#0f172a" font-size="11">字段候选池</text>
+        <rect x="360" y="574" width="220" height="28" rx="8" fill="#eef2ff" stroke="#6366f1" />
+        <text x="470" y="593" text-anchor="middle" fill="#3730a3" font-size="11">数据落地/索引</text>
+
+        <line x1="470" y1="570" x2="470" y2="574" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow2)" />
+
+        <defs>
+          <marker id="arrow2" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <p>能力颗粒库的详细清单、实现方式与分类落库映射统一放在 3.3.2 章节中，便于与落库策略融合管理。</p>
+
+    <h4>3.1 template 简单案件</h4>
+    <ul>
+      <li><strong>核心选择：</strong> 文本抽取 + OCR/表格识别 + 实体/关系抽取 + 质量校验 + 落库归档。</li>
+      <li><strong>IM 多模态：</strong> 文本/图片/语音/视频分流解析，OCR + ASR + 关键帧，重建对话时间线与事件序列。</li>
+      <li><strong>直接文件：</strong> PDF/图片全量 OCR + 表格识别；Excel 全量解析；EML 头/正文/附件解析。</li>
+      <li><strong>产出：</strong> 高完整度结构化候选池，可直接进入草表生成与复核。</li>
+    </ul>
+
+    <h4>3.2 template 复杂案件</h4>
+    <ul>
+      <li><strong>核心选择：</strong> 元数据抽取 + 轻量索引 + 时间线/参与者 + 初版关系图谱。</li>
+      <li><strong>IM 轻索引：</strong> 先抽取参与者、时间线与消息摘要，多媒体仅建索引与元数据。</li>
+      <li><strong>定向深解析：</strong> 基于案情条件（时间/地点/人物/关系）触发 OCR/ASR/表格识别与实体抽取。</li>
+      <li><strong>多轮迭代：</strong> 条件变化 → 定向解析 → 草表更新，保留可追溯链路。</li>
+    </ul>
+
+    <h4>3.3 策略切换与数据落地（3级功能）</h4>
+    <ul>
+      <li>按案件数据量、文件类型占比、风险等级或命中规则决定 A/C；支持“C → A”按需升级。</li>
+      <li>字段候选池：输出字段候选（值/来源证据ID/提取方式/置信度/时间戳），为证据挖掘阶段的字段融合与草表生成提供输入。</li>
+      <li>落地与治理：以统一命名空间落地到数据库层（SQL / 湖仓 / 向量库 / 图数据库），按 caseId/batch/ingest_date 分区；元数据索引与 schema 规划。</li>
+      <li>监控：P95/P99、OCR 置信度、抽帧命中率，资源限流保障多租户稳定。</li>
+    </ul>
+
+    <details class="collapsible sub-box" open>
+      <summary><h5>3.3.1 能力颗粒库</h5></summary>
+           <p><strong>联合关联维度（默认）：</strong> 时间 + 物品 + 人物 + 金额 + 票据/订单。</p>
+      <table class="grid-table">
+        <tr><th>原子服务编号</th><th>原子能力（可独立开发）</th><th>实现方式（2-3 种）</th><th>数据库/存储方式</th><th>说明/输出</th><th>状态</th></tr>
+        <tr><td>S1</td><td>IM 对话时序解析服务</td><td>IM 导出格式解析；时间线重建；消息去重/合并</td><td>SQL（消息/会话）+ ES（全文）</td><td>还原对话时间线 JSON（已具备）</td><td>已具备</td></tr>
+        <tr><td>S2</td><td>IM 图片解析服务（父能力）</td><td>批量转码；OCR/表格识别；感知哈希</td><td>对象存储（原件/转码）+ ES（文本）+ SQL（元数据）</td><td>IM 图片结构化与索引（子能力：S3/S4）</td><td>需改造</td></tr>
+        <tr><td>S21</td><td>图片分类服务（子能力）</td><td>图像分类模型；表格疑似检测；场景/材质识别</td><td>SQL（分类结果）+ ES（标签）</td><td>图片类型/场景/表格疑似判别</td><td>需改造</td></tr>
+        <tr><td>S22</td><td>商品图像信息查询服务（子能力）</td><td>商品要素识别；向量相似检索；商品库匹配</td><td>向量库 + SQL（商品主数据）</td><td>商品要素识别 + 相似商品检索</td><td>已具备</td></tr>
+        <tr><td>S3</td><td>IM 语音解析服务</td><td>音频转码；ASR 转写；说话人区分</td><td>对象存储（音频）+ ES/SQL（转写）</td><td>语音转写与时间对齐片段</td><td>需改造</td></tr>
+        <tr><td>S4</td><td>IM 视频解析服务</td><td>视频转码；ASR 转写；关键帧抽取</td><td>对象存储（视频/帧）+ ES/SQL（转写）</td><td>关键帧索引与转写文本</td><td>待讨论确认</td></tr>
+        <tr><td>S5</td><td>PDF/图片表格解析服务</td><td>OCR+表格识别；深度学习结构识别；规则模板抽取</td><td>SQL/湖仓（表格 JSON）+ ES（全文）</td><td>表格 JSON 与行列结构</td><td>需改造，进行中</td></tr>
+        <tr><td>S6</td><td>Excel 结构化解析服务</td><td>多 Sheet 解析；合并单元格处理；公式展开</td><td>SQL（结构化主表）或湖仓（大体量）</td><td>多 Sheet/合并单元格结构化</td><td>已具备</td></tr>
+        <tr><td>S7</td><td>邮件解析服务</td><td>MIME/头部解析；正文抽取；附件链路解析</td><td>对象存储（附件）+ SQL（元数据）+ ES（正文）</td><td>邮件元数据 + 正文/附件</td><td>已具备</td></tr>
+        <tr><td>S8</td><td>实体抽取服务</td><td>字典/规则抽取；NER 模型；LLM 提示抽取</td><td>SQL（实体表）+ 图数据库（可选）</td><td>人/地/物/时间标准化</td><td>待讨论确认</td></tr>
+        <tr><td>S9</td><td>关系/图谱构建服务</td><td>规则模板；图谱推断；LLM 关系抽取</td><td>图数据库 + SQL（关系索引）</td><td>关系边与置信度</td><td>待讨论确认</td></tr>
+        <tr><td>S10</td><td>轻量索引服务</td><td>关键词倒排；元数据索引；向量轻索引</td><td>ES/向量库</td><td>快速检索索引</td><td>需改造</td></tr>
+        <tr><td>S11</td><td>质量校验服务</td><td>规则校验；置信度阈值；抽样人工复核</td><td>SQL（质量日志）</td><td>质量评分/异常标记</td><td>规划中</td></tr>
+        <tr><td>S12</td><td>落库归档服务</td><td>SQL 主表入库；ES/向量库入库；湖仓批量入库</td><td>SQL/ES/向量库/湖仓</td><td>持久化数据</td><td>待讨论确认</td></tr>
+      </table>
+    </details>
+
+    <h4>3.4 编排示例（简单/复杂）</h4>
+    <ul>
+      <li><strong>简单案件（一次性高质量）：</strong> 元数据抽取 → 文本抽取/OCR/表格识别 → 实体/关系抽取 → 质量校验 → 落库 → 字段候选池。</li>
+      <li><strong>复杂案件（分层+多轮）：</strong> 元数据抽取 → 轻量索引 → 时间线/参与者 → 初版图谱 → 条件筛选 → 定向深解析 → 迭代更新。</li>
+      <li><strong>关系图谱增量：</strong> 实体/关系抽取结果持续回写图谱，记录证据来源与置信度，形成可追溯的图谱版本。</li>
+      <li><strong>切换机制：</strong> 依据文件量、结构化占比与图谱复杂度动态调整 A/C 策略，触发“C → A”按需升级。</li>
+    </ul>
+  </div>
+
+  <div class="phase-card">
+    <h3>4.证据挖掘（增强 LLM / BI数据分析）</h3>
+    <p>证据挖掘采用“按结构化程度分支”的闭环流程，结合规则、SQL/BI 与 LLM/图谱推断，服务证据大表字段填充与复核闭环。</p>
+          <summary><h5>挖掘分支处理闭环（按数据结构化程度）</h5></summary>
+        <ul>
+          <li><strong>高结构化（表格/票据为主）：</strong> SQL/BI 主导 → 规则匹配/聚合/对账 → 异常识别 → 证据大表字段填充 → 规则阈值回写与口径修订。</li>
+          <li><strong>混合型（表格 + IM/多模态）：</strong> SQL/BI 与 LLM 并行 → 结构化字段对齐 + 语义抽取融合 → 关系图谱校验/补全 → 大表填充与置信度评分 → 回写规则与提示模板。</li>
+          <li><strong>低结构化（IM/多模态为主）：</strong> LLM 语义理解 + 图谱推断 → 事件链路/人物关系生成 → 定向触发深解析（OCR/ASR/关键帧）→ 大表填充 → 多轮条件调整与图谱增量更新。</li>
+        </ul>
+        <p>分支选择依据：结构化占比、字段缺失率、图谱复杂度与案情要求；支持“低结构化 → 混合型 → 高结构化”按需升级。</p>
+
+    <div class="flow-wrap">
+      <svg viewBox="0 0 1200 360" aria-label="挖掘分支闭环流程图">
+        <rect x="40" y="20" width="220" height="28" rx="8" fill="#e5efff" stroke="#94a3b8" />
+        <text x="150" y="39" text-anchor="middle" fill="#0f172a" font-size="11">挖掘入口（字段候选池/索引/图谱）</text>
+        <rect x="320" y="20" width="240" height="28" rx="8" fill="#f1f5f9" stroke="#94a3b8" />
+        <text x="440" y="39" text-anchor="middle" fill="#0f172a" font-size="11">结构化程度判断</text>
+        <line x1="260" y1="34" x2="320" y2="34" stroke="#94a3b8" stroke-width="2" />
+
+        <line x1="440" y1="48" x2="440" y2="70" stroke="#94a3b8" stroke-width="2" />
+        <line x1="160" y1="70" x2="720" y2="70" stroke="#94a3b8" stroke-width="2" />
+        <line x1="160" y1="70" x2="160" y2="86" stroke="#94a3b8" stroke-width="2" />
+        <line x1="440" y1="70" x2="440" y2="86" stroke="#94a3b8" stroke-width="2" />
+        <line x1="720" y1="70" x2="720" y2="86" stroke="#94a3b8" stroke-width="2" />
+
+        <rect x="40" y="86" width="240" height="26" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="160" y="103" text-anchor="middle" fill="#92400e" font-size="10">高结构化（SQL/BI）</text>
+        <rect x="320" y="86" width="240" height="26" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="440" y="103" text-anchor="middle" fill="#92400e" font-size="10">混合型（规则 + LLM）</text>
+        <rect x="600" y="86" width="240" height="26" rx="8" fill="#fef9c3" stroke="#f59e0b" />
+        <text x="720" y="103" text-anchor="middle" fill="#92400e" font-size="10">低结构化（LLM/图谱）</text>
+
+        <rect x="40" y="120" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="160" y="136" text-anchor="middle" fill="#92400e" font-size="9">SQL/BI 规则分析</text>
+        <rect x="40" y="150" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="160" y="166" text-anchor="middle" fill="#92400e" font-size="9">异常识别/对账</text>
+        <rect x="40" y="180" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="160" y="196" text-anchor="middle" fill="#92400e" font-size="9">证据大表字段填充</text>
+        <rect x="40" y="210" width="240" height="24" rx="6" fill="#eef2ff" stroke="#6366f1" />
+        <text x="160" y="226" text-anchor="middle" fill="#3730a3" font-size="9">规则阈值/口径回写</text>
+
+        <rect x="320" y="120" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="440" y="136" text-anchor="middle" fill="#92400e" font-size="9">结构化+语义融合</text>
+        <rect x="320" y="150" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="440" y="166" text-anchor="middle" fill="#92400e" font-size="9">图谱校验/补全</text>
+        <rect x="320" y="180" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="440" y="196" text-anchor="middle" fill="#92400e" font-size="9">证据大表字段填充</text>
+        <rect x="320" y="210" width="240" height="24" rx="6" fill="#eef2ff" stroke="#6366f1" />
+        <text x="440" y="226" text-anchor="middle" fill="#3730a3" font-size="9">回写规则/提示/图谱</text>
+
+        <rect x="600" y="120" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="720" y="136" text-anchor="middle" fill="#92400e" font-size="9">语义理解/图谱推断</text>
+        <rect x="600" y="150" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="720" y="166" text-anchor="middle" fill="#92400e" font-size="9">定向深解析触发</text>
+        <rect x="600" y="180" width="240" height="24" rx="6" fill="#fff7cc" stroke="#f59e0b" />
+        <text x="720" y="196" text-anchor="middle" fill="#92400e" font-size="9">证据大表字段填充</text>
+        <rect x="600" y="210" width="240" height="24" rx="6" fill="#eef2ff" stroke="#6366f1" />
+        <text x="720" y="226" text-anchor="middle" fill="#3730a3" font-size="9">多轮条件更新/图谱增量</text>
+
+        <line x1="160" y1="112" x2="160" y2="120" stroke="#94a3b8" stroke-width="2" />
+        <line x1="160" y1="144" x2="160" y2="150" stroke="#94a3b8" stroke-width="2" />
+        <line x1="160" y1="174" x2="160" y2="180" stroke="#94a3b8" stroke-width="2" />
+        <line x1="160" y1="204" x2="160" y2="210" stroke="#94a3b8" stroke-width="2" />
+
+        <line x1="440" y1="112" x2="440" y2="120" stroke="#94a3b8" stroke-width="2" />
+        <line x1="440" y1="144" x2="440" y2="150" stroke="#94a3b8" stroke-width="2" />
+        <line x1="440" y1="174" x2="440" y2="180" stroke="#94a3b8" stroke-width="2" />
+        <line x1="440" y1="204" x2="440" y2="210" stroke="#94a3b8" stroke-width="2" />
+
+        <line x1="720" y1="112" x2="720" y2="120" stroke="#94a3b8" stroke-width="2" />
+        <line x1="720" y1="144" x2="720" y2="150" stroke="#94a3b8" stroke-width="2" />
+        <line x1="720" y1="174" x2="720" y2="180" stroke="#94a3b8" stroke-width="2" />
+        <line x1="720" y1="204" x2="720" y2="210" stroke="#94a3b8" stroke-width="2" />
+      </svg>
+    </div>
+
+
+
+
+ 
+
+
+    <details class="collapsible" open>
+      <summary><h5>证据挖掘原子能力规划（AI生成初步、有待详细规划）</h5></summary>
+      <table class="grid-table">
+        <tr><th>序号</th><th>原子能力/子能力</th><th>目标字段/规则</th><th>实现方式（简述）</th><th>输出/落表</th><th>来源/归属</th><th>备注</th></tr>
+        <tr><td>1</td><td>S10 轻量索引服务</td><td>检索召回/筛选</td><td>关键词倒排 + 向量召回</td><td>检索结果集</td><td>3.3.1</td><td></td></tr>
+        <tr><td>2</td><td>S8 实体抽取服务</td><td>人/地/物/时间</td><td>规则/NER/LLM 抽取</td><td>实体标准化字段</td><td>3.3.1</td><td></td></tr>
+        <tr><td>3</td><td>S9 关系/图谱构建服务</td><td>关系边/来源证据</td><td>关系抽取 + 图谱入库</td><td>关系边与证据链</td><td>3.3.1</td><td></td></tr>
+        <tr><td>4</td><td>S11 质量校验服务</td><td>一致性/置信度</td><td>规则校验 + 抽样复核</td><td>复核清单</td><td>3.3.1</td><td></td></tr>
+        <tr><td>5</td><td>S12 落库归档服务</td><td>草表/图谱/结果</td><td>SQL/ES/湖仓入库</td><td>持久化结果</td><td>3.3.1</td><td></td></tr>
+        <tr><td>6</td><td>M1 规则引擎与评分服务</td><td>案型规则/评分</td><td>规则模板 + 阈值计算</td><td>命中清单/评分解释</td><td>证据挖掘</td><td></td></tr>
+        <tr><td>7</td><td>M1-时间窗匹配</td><td>交易/支付/物流/通讯时间</td><td>SQL 窗口函数 + 时间桶</td><td>时间一致性标记</td><td>M1</td><td></td></tr>
+        <tr><td>8</td><td>M1-订单/票据号匹配</td><td>订单号/小票号/运单号</td><td>主键对齐 + 冲突检测</td><td>关联键统一/冲突字段</td><td>M1</td><td></td></tr>
+        <tr><td>9</td><td>M1-人物主体匹配</td><td>证件号/手机号/账号</td><td>多键归一 + 消歧规则</td><td>主体归并/角色标签</td><td>M1</td><td></td></tr>
+        <tr><td>10</td><td>M1-金额与币种校验</td><td>应付/实付/转账差异</td><td>差额阈值 + 币种换算</td><td>金额差异/异常评分</td><td>M1</td><td></td></tr>
+        <tr><td>11</td><td>M1-商品数量一致性</td><td>品名/型号/规格/数量</td><td>规格归一 + 单价校验</td><td>商品维度校验结果</td><td>M1</td><td></td></tr>
+        <tr><td>12</td><td>M1-物流路径规则</td><td>发货/收货/过货一致性</td><td>路径规则 + 时间对齐</td><td>路径异常/链路缺口</td><td>M1</td><td></td></tr>
+        <tr><td>13</td><td>M1-票据/凭证规则</td><td>发票/保卡/关单对齐</td><td>票据号关联 + 缺失标记</td><td>补证线索/缺失清单</td><td>M1</td><td></td></tr>
+        <tr><td>14</td><td>M1-跨源一致性</td><td>交易/支付/对话/物流</td><td>多源 JOIN + 冲突标注</td><td>冲突字段/解释</td><td>M1</td><td></td></tr>
+        <tr><td>15</td><td>M1-异常模式检测</td><td>高频/拆分支付/异常折扣</td><td>规则模板 + 统计阈值</td><td>异常命中/评分解释</td><td>M1</td><td></td></tr>
+        <tr><td>16</td><td>M2 证据大表字段填充服务</td><td>字段融合/冲突消解</td><td>字段融合 + 置信度评分</td><td>字段填充结果</td><td>证据挖掘</td><td></td></tr>
+        <tr><td>17</td><td>M2-结构化字段对齐</td><td>订单/商品/金额/时间/人物</td><td>字段映射表 + 口径统一</td><td>统一字段值与来源</td><td>M2</td><td></td></tr>
+        <tr><td>18</td><td>M2-商品语义抽取</td><td>品牌/型号/序列号/保卡</td><td>语义抽取 + 实体标准化</td><td>商品主数据字段</td><td>M2</td><td></td></tr>
+        <tr><td>19</td><td>M2-价格与交易语义</td><td>报价/折扣/实付/税金</td><td>数值解析 + 语义归类</td><td>价格拆解字段</td><td>M2</td><td></td></tr>
+        <tr><td>20</td><td>M2-人物角色语义</td><td>买家/卖家/代购/中间人</td><td>关系语义识别 + 角色绑定</td><td>角色字段/关系边</td><td>M2</td><td></td></tr>
+        <tr><td>21</td><td>M2-证据来源融合</td><td>多来源同字段冲突</td><td>置信度加权 + 冲突消解</td><td>融合值/冲突解释</td><td>M2</td><td></td></tr>
+        <tr><td>22</td><td>M2-语义补证建议</td><td>缺失字段线索</td><td>缺口检测 + 线索生成</td><td>补证建议清单</td><td>M2</td><td></td></tr>
+        <tr><td>23</td><td>M3 图谱路径分析与链路生成</td><td>链路推断/可视化</td><td>图查询 + 路径评分</td><td>链路解释与评分</td><td>证据挖掘</td><td></td></tr>
+        <tr><td>24</td><td>M3-事件链语义抽取</td><td>交易/转账/运输/沟通</td><td>事件模板 + 时间线排序</td><td>事件节点/时间线</td><td>M3</td><td></td></tr>
+        <tr><td>25</td><td>M3-关系强度计算</td><td>共现/资金往来/共用账号</td><td>频次统计 + 权重函数</td><td>关系权重/置信度</td><td>M3</td><td></td></tr>
+        <tr><td>26</td><td>M3-上下游/团伙识别</td><td>关键节点与角色聚类</td><td>社区发现 + 中心性指标</td><td>核心嫌疑人排序</td><td>M3</td><td></td></tr>
+        <tr><td>27</td><td>M3-多轮条件更新</td><td>案情条件变化</td><td>增量推断 + 结果回写</td><td>图谱增量/字段补齐</td><td>M3</td><td></td></tr>
+        <tr><td>28</td><td>M4 LLM/多模态推理服务</td><td>语义抽取/摘要</td><td>LLM 提示 + 多模态解析</td><td>摘要/抽取结果</td><td>证据挖掘</td><td></td></tr>
+        <tr><td>29</td><td>M5 BI 指标聚合服务</td><td>指标计算/对账/异常</td><td>SQL 聚合 + 规则阈值</td><td>指标/异常检测</td><td>证据挖掘</td><td></td></tr>
+      </table>
+    </details>
+
+
+  </div>
+
+  <div class="phase-card">
+    <h3>5.证据复核 / 输出</h3>
+    <ul>
+      <li>人工审核流：任务分派、会签、抽检比例；高风险命中需人工确认；误报/确认反馈回模型与规则。</li>
+      <li>证据大表定稿：对冲突字段、关键字段进行人工确认与签名；草表转为定稿版本并纳入审计。</li>
+      <li>证据追溯：文件/批次哈希与 manifest 校验，处理链路时间线，操作/导出审计日志可检索。</li>
+      <li>输出：加密打包、水印、临时令牌、二次审批；报告模版（简/详/审计版）含清单、哈希、命中摘要、图表/图谱。</li>
+      <li>合规与留存：数据保留/归档策略、冷存与合规锁、外发审计；指标：复核吞吐/通过率、导出/报告耗时、审计日志完整性。</li>
+    </ul>
+  </div>
+
+ 
+
+
+  <p id="page-version" style="margin-top:18px;color:#52616b">版本：<span id="version-date">----</span> · 适配海关案件数据分析平台</p>
+  </div>
+  <script>
+    (function () {
+      function ensurePrintPageStyle(widthPx, heightPx) {
+        var styleId = "print-page-style";
+        var styleEl = document.getElementById(styleId);
+        if (!styleEl) {
+          styleEl = document.createElement("style");
+          styleEl.id = styleId;
+          document.head.appendChild(styleEl);
+        }
+        styleEl.textContent =
+          "@page { size: " + widthPx + "px " + heightPx + "px; margin: 0; }" +
+          "@media print { html, body { width: " + widthPx + "px; height: " + heightPx + "px; } }";
+      }
+
+      function getUtc8Stamp() {
+        var now = new Date();
+        var utc8 = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+        var year = utc8.getUTCFullYear();
+        var month = String(utc8.getUTCMonth() + 1).padStart(2, "0");
+        var day = String(utc8.getUTCDate()).padStart(2, "0");
+        var hours = String(utc8.getUTCHours()).padStart(2, "0");
+        var minutes = String(utc8.getUTCMinutes()).padStart(2, "0");
+        var seconds = String(utc8.getUTCSeconds()).padStart(2, "0");
+        return {
+          display: year + "-" + month + "-" + day + " " + hours + ":" + minutes + ":" + seconds,
+          file: year + month + day + "_" + hours + minutes + seconds
+        };
+      }
+
+      var stamp = getUtc8Stamp();
+      var el = document.getElementById("version-date");
+      if (el) {
+        el.textContent = stamp.display;
+      }
+
+      var btn = document.getElementById("export-pdf");
+      if (!btn) {
+        return;
+      }
+      window.addEventListener("beforeprint", function () {
+        document.body.classList.add("exporting");
+      });
+      window.addEventListener("afterprint", function () {
+        document.body.classList.remove("exporting");
+        btn.disabled = false;
+        btn.textContent = "导出PDF";
+      });
+      btn.addEventListener("click", function () {
+        var updated = getUtc8Stamp();
+        var versionEl = document.getElementById("version-date");
+        if (versionEl) {
+          versionEl.textContent = updated.display;
+        }
+        btn.disabled = true;
+        btn.textContent = "请在打印面板保存为PDF";
+        var root = document.documentElement;
+        var fullWidth = Math.max(root.scrollWidth, root.clientWidth);
+        var fullHeight = Math.max(root.scrollHeight, root.clientHeight);
+        ensurePrintPageStyle(fullWidth, fullHeight);
+        setTimeout(function () {
+          window.print();
+        }, 50);
+      });
+    })();
+  </script>
+</body>
+</html>
