@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(claude plugin install:*)",
@@ -9,7 +12,21 @@
       "Bash(gh auth status:*)",
       "Bash(gh auth login:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git clone:*)",
+      "Bash(npm install:*)",
+      "Bash(claude-flow:*)",
+      "Bash(npx:*)",
+      "Bash(chmod:*)",
+      "Bash(npm info:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "claude-flow",
+    "ruv-swarm",
+    "flow-nexus"
+  ]
 }

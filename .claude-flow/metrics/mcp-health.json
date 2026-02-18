@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-02-18T07:27:35.881Z",
+  "project": "/Users/titan/Desktop/Customs",
+  "checks": [
+    {
+      "name": "MCP Configuration",
+      "status": "ok",
+      "servers": [
+        "claude-flow",
+        "ruv-swarm",
+        "flow-nexus"
+      ],
+      "autoStart": [
+        "claude-flow",
+        "ruv-swarm"
+      ],
+      "enabled": [
+        "claude-flow",
+        "ruv-swarm"
+      ],
+      "message": "2/3 servers enabled, 2 auto-start"
+    },
+    {
+      "name": "Claude Flow Install",
+      "status": "ok",
+      "version": "claude-flow",
+      "message": "Claude Flow vclaude-flow"
+    },
+    {
+      "name": "Daemon Status",
+      "status": "ok",
+      "pid": "58800",
+      "message": "Daemon running"
+    },
+    {
+      "name": "Memory System",
+      "status": "ok",
+      "message": "Memory system initialized"
+    },
+    {
+      "name": "Swarm Configuration",
+      "status": "ok",
+      "message": "Swarm configured"
+    },
+    {
+      "name": "Project Settings",
+      "status": "ok",
+      "mcpPermissions": true,
+      "v3Enabled": true,
+      "message": "Settings configured (MCP: yes, V3: yes)"
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "ok": 6,
+    "warning": 0,
+    "error": 0
+  },
+  "status": "ok"
+}

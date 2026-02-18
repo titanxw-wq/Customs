@@ -1,0 +1,53 @@
+{
+  "mcpServers": {
+    "claude-flow": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@claude-flow/cli@latest",
+        "mcp",
+        "start"
+      ],
+      "env": {
+        "CLAUDE_FLOW_MODE": "v3",
+        "CLAUDE_FLOW_HOOKS_ENABLED": "true",
+        "CLAUDE_FLOW_TOPOLOGY": "hierarchical-mesh",
+        "CLAUDE_FLOW_MAX_AGENTS": "15",
+        "CLAUDE_FLOW_MEMORY_BACKEND": "hybrid",
+        "CLAUDE_FLOW_AUTO_START": "true"
+      },
+      "autoStart": true,
+      "disabled": false
+    },
+    "ruv-swarm": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "ruv-swarm",
+        "mcp",
+        "start"
+      ],
+      "env": {
+        "RUV_SWARM_MODE": "v3",
+        "RUV_SWARM_TOPOLOGY": "hierarchical-mesh"
+      },
+      "autoStart": true,
+      "optional": true,
+      "disabled": false
+    },
+    "flow-nexus": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "flow-nexus@latest",
+        "mcp",
+        "start"
+      ],
+      "env": {},
+      "autoStart": false,
+      "optional": true,
+      "requiresAuth": true,
+      "disabled": true
+    }
+  }
+}
